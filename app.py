@@ -40,7 +40,9 @@ if st.button("Generate Campaign"):
     else:
         try:
             with st.spinner('Generating...'):
-                prompt = f"Analyze {url}. Return JSON: {{'pins': [{'title': 'Example Title', 'hook': 'Example Hook'}], 'seo': {'keywords': ['tag1'], 'description': 'desc'}}}"
+                # FIXED: JSON structure is passed as plain text to avoid f-string formatting errors
+                json_example = '{"pins": [{"title": "Example Title", "hook": "Example Hook"}], "seo": {"keywords": ["tag1"], "description": "desc"}}'
+                prompt = "Analyze " + url + ". Return ONLY valid JSON in this format: " + json_example
                 
                 completion = client.chat.completions.create(
                     model="llama-3.3-70b-versatile",
@@ -52,9 +54,10 @@ if st.button("Generate Campaign"):
                 
                 zip_buffer = io.BytesIO()
                 with zipfile.ZipFile(zip_buffer, "w") as zf:
-                    # PDF Setup
+                    # PDF Generation
                     seo_data = data.get("seo", {})
-                    seo_str = f"Keywords: {', '.join(seo_data.get('keywords', []))}\nDescription: {seo_data.get('description', '')}"
+                    keywords = ", ".join(seo_data.get("keywords", []))
+                    seo_str = "Keywords: " + keywords + "\n\nDescription: " + seo_data.get("description", "")
                     
                     pdf = FPDF()
                     pdf.add_page()
@@ -63,12 +66,12 @@ if st.button("Generate Campaign"):
                     pdf.multi_cell(0, 10, txt=seo_str)
                     zf.writestr("seo.pdf", pdf.output(dest='S').encode('latin-1'))
                     
-                    # Pins
+                    # Pins Generation
                     for i, pin in enumerate(data.get("pins", [])):
                         img_bytes = create_unique_branded_pin(pin.get("title", "Pin"), pin.get("hook", "Hook"))
-                        zf.writestr(f"pin_{i}.png", img_bytes)
+                        zf.writestr("pin_" + str(i) + ".png", img_bytes)
                 
                 st.success("Campaign Ready!")
                 st.download_button("📥 Download Campaign", zip_buffer.getvalue(), "campaign.zip")
         except Exception as e:
-            st.error(f"Error: {e}")
+            st.error("Error: " + str(e))
