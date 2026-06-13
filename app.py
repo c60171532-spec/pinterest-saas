@@ -1,69 +1,57 @@
 import streamlit as st
 from groq import Groq
-import json
-import io
-import zipfile
+from PIL import Image, ImageDraw, ImageFont
+import json, io, zipfile, os
 from fpdf import FPDF
 from json_repair import repair_json
 
-st.set_page_config(page_title="Pinterest SaaS", layout="centered")
+# Setup
+client = Groq(api_key=st.secrets["GROQ_API_KEY"])
 
-# API Setup
-api_key = st.secrets.get("GROQ_API_KEY")
-client = Groq(api_key=api_key)
+def create_pin_image(title):
+    # Ek basic template (1000x1500)
+    img = Image.new('RGB', (1000, 1500), color=(73, 109, 137))
+    d = ImageDraw.Draw(img)
+    d.text((100, 700), title, fill=(255, 255, 255)) # Yahan tum font bhi load kar sakte ho
+    img_byte_arr = io.BytesIO()
+    img.save(img_byte_arr, format='PNG')
+    return img_byte_arr.getvalue()
 
 def create_pdf(data):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", 'B', 16)
-    pdf.cell(200, 10, txt="Pinterest SEO Strategy", ln=True, align='C')
-    pdf.set_font("Arial", size=10)
+    pdf.cell(200, 10, txt="Pinterest Sales Strategy", ln=True, align='C')
     pdf.multi_cell(0, 10, txt=str(data))
     return pdf.output(dest='S').encode('latin-1')
 
-st.title("📌 Pinterest Sales Generator")
-url = st.text_input("Enter Product URL:", placeholder="https://your-product-link.com")
+st.title("📌 Pinterest Sales Conversion Machine")
+url = st.text_input("Product URL:")
 
-if st.button("Generate Campaign"):
-    if not url:
-        st.warning("Please enter a URL first!")
-    elif not api_key:
-        st.error("GROQ_API_KEY is missing!")
-    else:
-        try:
-            with st.spinner('Generating campaign...'):
-                prompt = f"Analyze {url}. Return JSON only with keys: 'pins', 'seo_package', 'posting_calendar'."
-                
-                completion = client.chat.completions.create(
-                    model="llama-3.3-70b-versatile",
-                    messages=[
-                        {"role": "system", "content": "You are a Pinterest SEO expert. Return ONLY valid JSON."},
-                        {"role": "user", "content": prompt}
-                    ]
-                )
-                
-                raw_content = completion.choices[0].message.content
-                data = json.loads(repair_json(raw_content))
-                
-                st.success("Campaign Generated Successfully!")
-                
-                # Display Results
-                st.subheader("📊 Generated Data")
-                st.write(data)
-                
-                # Zip File Logic (Fixed bytes issue)
-                zip_buffer = io.BytesIO()
-                with zipfile.ZipFile(zip_buffer, "w") as zf:
-                    zf.writestr("seo_package.pdf", create_pdf(data.get("seo_package", {})))
-                    zf.writestr("calendar.txt", str(data.get("posting_calendar", "")))
-                    zf.writestr("pins_data.json", json.dumps(data.get("pins", []), indent=4))
-                
-                # Download Button (Fixed with .getvalue())
-                st.download_button(
-                    label="📥 Download Campaign.zip",
-                    data=zip_buffer.getvalue(),
-                    file_name="Campaign.zip",
-                    mime="application/zip"
-                )
-        except Exception as e:
-            st.error(f"Something went wrong: {e}")
+if st.button("Generate Growth Campaign"):
+    with st.spinner('Crafting high-converting strategy...'):
+        prompt = f"""
+        Analyze {url}. Create 5 high-converting Pinterest Pins.
+        Return ONLY valid JSON with keys: 
+        "pins": [{"title": "...", "hook": "...", "cta": "..."}, ...],
+        "seo_package": {"keywords": [...], "board_names": [...]},
+        "posting_calendar": "30-day growth plan"
+        """
+        
+        completion = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        data = json.loads(repair_json(completion.choices[0].message.content))
+        
+        # Zip Creation
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w") as zf:
+            # Add SEO PDF
+            zf.writestr("seo_strategy.pdf", create_pdf(data["seo_package"]))
+            # Generate 5 Pin Images
+            for i, pin in enumerate(data["pins"]):
+                img_data = create_pin_image(pin["title"])
+                zf.writestr(f"Pin_{i+1}.png", img_data)
+        
+        st.download_button("📥 Download Growth Campaign.zip", zip_buffer.getvalue(), "Growth_Campaign.zip", "application/zip")
