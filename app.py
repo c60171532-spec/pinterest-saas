@@ -18,7 +18,6 @@ def create_pdf(data):
     pdf.set_font("Arial", 'B', 16)
     pdf.cell(200, 10, txt="Pinterest SEO Strategy", ln=True, align='C')
     pdf.set_font("Arial", size=10)
-    # Convert dict to string for PDF
     pdf.multi_cell(0, 10, txt=json.dumps(data, indent=2))
     return pdf.output(dest='S').encode('latin-1')
 
@@ -41,22 +40,21 @@ if st.button("Generate Campaign"):
                 "posting_calendar": string
                 """
                 
+                # Model update kiya hai yahan:
                 completion = client.chat.completions.create(
-                    model="llama3-70b-8192",
+                    model="llama-3.3-70b-versatile", 
                     messages=[
                         {"role": "system", "content": "You are a helpful assistant. Output only raw JSON."},
                         {"role": "user", "content": prompt}
                     ]
                 )
                 
-                # JSON load
                 content = completion.choices[0].message.content
                 data = json.loads(content)
                 
                 st.success("Campaign Generated!")
                 st.json(data)
                 
-                # Zip File Logic
                 zip_buffer = io.BytesIO()
                 with zipfile.ZipFile(zip_buffer, "w") as zf:
                     zf.writestr("seo_package.pdf", create_pdf(data["seo_package"]))
