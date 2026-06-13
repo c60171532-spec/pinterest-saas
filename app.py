@@ -5,6 +5,7 @@ import json, io, zipfile, textwrap
 from fpdf import FPDF
 from json_repair import repair_json
 
+# Setup
 client = Groq(api_key=st.secrets["GROQ_API_KEY"])
 
 def create_unique_branded_pin(title, hook):
@@ -12,15 +13,15 @@ def create_unique_branded_pin(title, hook):
     d = ImageDraw.Draw(img)
     font = ImageFont.load_default()
     
-    # Title - Wrapping text to fit nicely
+    # Title
     lines = textwrap.wrap(title.upper(), width=20)
-    y = 300
+    y = 400
     for line in lines:
         d.text((100, y), line, font=font, fill=(255, 255, 255))
-        y += 80
+        y += 60
         
     # Hook
-    d.text((100, 700), hook.upper(), font=font, fill=(200, 200, 255))
+    d.text((100, 800), hook.upper(), font=font, fill=(200, 200, 255))
     
     # Button
     d.rectangle([100, 1100, 900, 1250], fill=(79, 70, 229))
@@ -30,37 +31,43 @@ def create_unique_branded_pin(title, hook):
     img.save(img_byte_arr, format='PNG')
     return img_byte_arr.getvalue()
 
-st.title("📌 Pinterest 5-Pin Growth Machine")
-url = st.text_input("Product URL:")
+st.title("📌 Pinterest Sales Machine")
+url = st.text_input("Enter Product URL:")
 
-if st.button("Generate 5 Pins + SEO"):
-    with st.spinner('Generating 5 high-quality pins...'):
-        # Prompt explicitly asking for 5 pins
-        json_format = '{"pins": [{"title": "T1", "hook": "H1"}, {"title": "T2", "hook": "H2"}, {"title": "T3", "hook": "H3"}, {"title": "T4", "hook": "H4"}, {"title": "T5", "hook": "H5"}], "seo": {"keywords": ["k1"], "description": "d1"}}'
-        prompt = "Analyze " + url + ". Create exactly 5 unique, high-converting Pinterest pins. Return ONLY valid JSON in this format: " + json_format
-        
-        completion = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[{"role": "user", "content": prompt}]
-        )
-        
-        data = json.loads(repair_json(completion.choices[0].message.content))
-        
-        zip_buffer = io.BytesIO()
-        with zipfile.ZipFile(zip_buffer, "w") as zf:
-            # SEO PDF
-            seo_data = data.get("seo", {})
-            seo_str = "SEO PACKAGE:\nKeywords: " + ", ".join(seo_data.get("keywords", [])) + "\nDescription: " + seo_data.get("description", "")
-            pdf = FPDF()
-            pdf.add_page()
-            pdf.set_font("Arial", size=12)
-            pdf.multi_cell(0, 10, txt=seo_str)
-            zf.writestr("seo_package.pdf", pdf.output(dest='S').encode('latin-1'))
-            
-            # Loop through all 5 pins
-            for i, pin in enumerate(data.get("pins", [])):
-                img_bytes = create_unique_branded_pin(pin.get("title", "Growth"), pin.get("hook", "Learn More"))
-                zf.writestr(f"Pin_{i+1}.png", img_bytes)
-        
-        st.success("5 Pins & SEO Package Created!")
-        st.download_button("📥 Download All Files", zip_buffer.getvalue(), "pinterest_campaign.zip")
+if st.button("Generate Campaign"):
+    if not url:
+        st.error("Please enter a URL")
+    else:
+        try:
+            with st.spinner('Generating...'):
+                # Using concatenation to avoid f-string format errors
+                json_struct = '{"pins": [{"title": "Title 1", "hook": "Hook 1"}, {"title": "Title 2", "hook": "Hook 2"}], "seo": {"keywords": ["k1"], "description": "desc"}}'
+                prompt = "Analyze " + url + ". Return ONLY valid JSON in this format: " + json_struct
+                
+                completion = client.chat.completions.create(
+                    model="llama-3.3-70b-versatile",
+                    messages=[{"role": "user", "content": prompt}]
+                )
+                
+                data = json.loads(repair_json(completion.choices[0].message.content))
+                
+                zip_buffer = io.BytesIO()
+                with zipfile.ZipFile(zip_buffer, "w") as zf:
+                    # PDF
+                    seo_data = data.get("seo", {})
+                    seo_text = "Keywords: " + ", ".join(seo_data.get("keywords", [])) + "\nDescription: " + seo_data.get("description", "")
+                    pdf = FPDF()
+                    pdf.add_page()
+                    pdf.set_font("Arial", size=12)
+                    pdf.multi_cell(0, 10, txt=seo_text)
+                    zf.writestr("seo.pdf", pdf.output(dest='S').encode('latin-1'))
+                    
+                    # Pins
+                    for i, pin in enumerate(data.get("pins", [])):
+                        img = create_unique_branded_pin(pin.get("title", "Pin"), pin.get("hook", "Hook"))
+                        zf.writestr("pin_" + str(i) + ".png", img)
+                
+                st.success("Success!")
+                st.download_button("📥 Download Campaign", zip_buffer.getvalue(), "campaign.zip")
+        except Exception as e:
+            st.error("Error: " + str(e))
