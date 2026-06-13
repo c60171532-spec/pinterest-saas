@@ -12,17 +12,15 @@ st.set_page_config(page_title="Pinterest SaaS", layout="centered")
 api_key = st.secrets.get("GROQ_API_KEY")
 client = Groq(api_key=api_key)
 
-# PDF Function
 def create_pdf(data):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", 'B', 16)
     pdf.cell(200, 10, txt="Pinterest SEO Strategy", ln=True, align='C')
     pdf.set_font("Arial", size=10)
-    pdf.multi_cell(0, 10, txt=json.dumps(data, indent=2))
+    pdf.multi_cell(0, 10, txt=str(data))
     return pdf.output(dest='S').encode('latin-1')
 
-# UI Elements (Order mein hain)
 st.title("📌 Pinterest Sales Generator")
 url = st.text_input("Enter Product URL:", placeholder="https://your-product-link.com")
 
@@ -47,15 +45,25 @@ if st.button("Generate Campaign"):
                 raw_content = completion.choices[0].message.content
                 data = json.loads(repair_json(raw_content))
                 
-                st.success("Campaign Generated!")
-                st.json(data)
+                st.success("Campaign Generated Successfully!")
                 
-                # Download Logic
+                # Display Results
+                st.subheader("📊 Generated Data")
+                st.write(data)
+                
+                # Zip File Logic (Fixed bytes issue)
                 zip_buffer = io.BytesIO()
                 with zipfile.ZipFile(zip_buffer, "w") as zf:
-                    zf.writestr("seo_package.pdf", create_pdf(data["seo_package"]))
-                    zf.writestr("calendar.txt", data["posting_calendar"])
+                    zf.writestr("seo_package.pdf", create_pdf(data.get("seo_package", {})))
+                    zf.writestr("calendar.txt", str(data.get("posting_calendar", "")))
+                    zf.writestr("pins_data.json", json.dumps(data.get("pins", []), indent=4))
                 
-                st.download_button("📥 Download Campaign.zip", zip_buffer.getvalue(), "Campaign.zip", "application/zip")
+                # Download Button (Fixed with .getvalue())
+                st.download_button(
+                    label="📥 Download Campaign.zip",
+                    data=zip_buffer.getvalue(),
+                    file_name="Campaign.zip",
+                    mime="application/zip"
+                )
         except Exception as e:
             st.error(f"Something went wrong: {e}")
