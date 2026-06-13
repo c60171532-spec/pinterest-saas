@@ -1,44 +1,33 @@
 import streamlit as st
 import openai
 import json
+import zipfile
+import io
 
-# API Key setup (Streamlit secrets mein rakhna best hai)
-openai.api_key = st.secrets["OPENAI_API_KEY"]
+# ... (Previous imports and setup)
 
-st.set_page_config(page_title="Pinterest Sales Generator", layout="wide")
+# Function to create zip in memory
+def create_zip(data):
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w") as zf:
+        # Save SEO package as text file
+        seo_content = json.dumps(data["seo_package"], indent=4)
+        zf.writestr("seo_package.txt", seo_content)
+        
+        # Save Calendar as text file
+        zf.writestr("posting_calendar.txt", data["posting_calendar"])
+        
+    return zip_buffer.getvalue()
 
-st.title("📌 Pinterest Sales Conversion SaaS")
-st.subheader("Generate 5 High-Converting Pins in 60 Seconds")
+# Inside "Generate Campaign" block:
+# ... (After getting the data)
+st.json(data)
 
-product_url = st.text_input("Paste your Product URL here:")
-
-if st.button("Generate Campaign"):
-    if not product_url:
-        st.error("Please enter a URL!")
-    else:
-        with st.spinner('Analyzing your product and creating SEO strategy...'):
-            # Prompt for AI
-            prompt = f"""
-            Analyze the product URL: {product_url}. 
-            Provide a response in strict JSON format with these keys:
-            "pins": List of 5 objects (title, description, keywords, hashtags, hook, cta),
-            "seo_package": {{"keyword_research": "...", "board_strategy": "..."}},
-            "posting_calendar": "30-day plan"
-            """
-            
-            try:
-                response = openai.chat.completions.create(
-                    model="gpt-4o",
-                    messages=[{"role": "user", "content": prompt}],
-                    response_format={ "type": "json_object" }
-                )
-                
-                data = json.loads(response.choices[0].message.content)
-                
-                # Show results
-                st.success("Campaign Ready!")
-                st.json(data) # Yahan tum UI ko behtar bana sakte ho
-                
-                # Download button logic (future step)
-            except Exception as e:
-                st.error(f"Error: {e}")
+# Download Button
+zip_data = create_zip(data)
+st.download_button(
+    label="📥 Download Campaign.zip",
+    data=zip_data,
+    file_name="Campaign.zip",
+    mime="application/zip"
+)
